@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    input, button, select {
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+    tfoot {
+      font-weight: bold;
+    }
+    .month-header {
+      background-color: #f0f0f0;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Expense Tracker</h1>
+  <input type="text" id="description" placeholder="Expense description" />
+  <input type="number" id="amount" placeholder="Amount" />
+  <input type="date" id="date" />
+  <button onclick="addExpense()">Add Expense</button>
+
+  <label for="yearFilter">Filter by year:</label>
+  <select id="yearFilter" onchange="renderExpenses()">
+    <option value="all">All</option>
+  </select>
+
+  <button onclick="exportCSV()">Export CSV</button>
+  <button onclick="clearAllData()">Clear All Data</button>
+
+  <div id="expensesContainer"></div>
+
+  <script>
+    let expenses = [];
+
+    function saveExpenses() {
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+    }
+
+    function loadExpenses() {
+      const stored = localStorage.getItem('expenses');
+      if (stored) {
+        expenses = JSON.parse(stored);
+      }
+    }
+
+    function addExpense() {
+      const desc = document.getElementById('description').value;
+      const amt = parseFloat(document.getElementById('amount').value);
+      const date = document.getElementById('date').value;
+
+      if (!desc || isNaN(amt) || amt <= 0 || !date) {
+        alert('Please enter a valid description, amount, and date.');
+        return;
+      }
+
+      expenses.push({ description: desc, amount: amt, date });
+
+      document.getElementById('description').value = '';
+      document.getElementById('amount').value = '';
+      document.getElementById('date').value = '';
+
+      saveExpenses();
+      updateYearFilter();
+      renderExpenses();
+    }
+
+    function updateYearFilter() {
+      const yearFilter = document.getElementById('yearFilter');
+      const years = Array.from(new Set(expenses.map(e => e.date.slice(0, 4))));
+      yearFilter.innerHTML = '<option value="all">All</option>';
+      years.sort().forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearFilter.appendChild(option);
+      });
+    }
+
+    function groupByMonth(data) {
+      const groups = {};
+      data.forEach(item => {
+        const month = item.date.slice(0, 7); // YYYY-MM
+        if (!groups[month]) groups[month] = [];
+        groups[month].push(item);
+      });
+      return groups;
+    }
+
+    function renderExpenses() {
+      const container = document.getElementById('expensesContainer');
+      container.innerHTML = '';
+
+      const selectedYear = document.getElementById('yearFilter').value;
+      const filteredExpenses = selectedYear === 'all' ? expenses : expenses.filter(e => e.date.startsWith(selectedYear));
+
+      const grouped = groupByMonth(filteredExpenses);
+      const sortedMonths = Object.keys(grouped).sort().reverse();
+
+      sortedMonths.forEach(month => {
+        const monthExpenses = grouped[month];
+        let monthTotal = 0;
+
+        const table = document.createElement('table');
+        const header = document.createElement('tr');
+        header.innerHTML = `<th>Description</th><th>Amount</th><th>Date</th>`;
+        const thead = document.createElement('thead');
+        thead.appendChild(header);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        monthExpenses.forEach(exp => {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${exp.description}</td><td>BGN ${exp.amount.toFixed(2)}</td><td>${exp.date}</td>`;
+          tbody.appendChild(row);
+          monthTotal += exp.amount;
+        });
+        table.appendChild(tbody);
+
+        const tfoot = document.createElement('tfoot');
+        const footRow = document.createElement('tr');
+        footRow.innerHTML = `<td colspan="3">Total for ${month}: BGN ${monthTotal.toFixed(2)}</td>`;
+        tfoot.appendChild(footRow);
+        table.appendChild(tfoot);
+
+        const monthTitle = document.createElement('div');
+        monthTitle.className = 'month-header';
+        monthTitle.textContent = `${month}`;
+
+        container.appendChild(monthTitle);
+        container.appendChild(table);
+      });
+    }
+
+    function exportCSV() {
+      let csv = 'Description,Amount,Date\n';
+      expenses.forEach(exp => {
+        csv += `"${exp.description}",${exp.amount},${exp.date}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'expenses.csv';
+      a.click();
+    }
+
+    function clearAllData() {
+      if (confirm('Are you sure you want to clear all expenses?')) {
+        expenses = [];
+        localStorage.removeItem('expenses');
+        updateYearFilter();
+        renderExpenses();
+      }
+    }
+
+    loadExpenses();
+    updateYearFilter();
+    renderExpenses();
+  </script>
+</body>
+</html>
